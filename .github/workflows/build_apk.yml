@@ -10,7 +10,7 @@ on:
 
 jobs:
   build-apk:
-    name: Flutter Build → Release APK
+    name: Flutter Build -> Debug APK
     runs-on: ubuntu-22.04
 
     env:
@@ -21,21 +21,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── Verify native deps are present ────────────────────────────────────
       - name: Check third_party libs exist
         run: |
+          set -euo pipefail
           MISSING=0
           for ABI in arm64-v8a armeabi-v7a x86_64; do
             for LIB in sqlcipher argon2; do
               F="src/cpp/third_party/${LIB}/${ABI}/lib${LIB}.a"
               if [ ! -f "$F" ]; then
-                echo "✗ Missing: $F"
+                echo "Missing: $F"
                 MISSING=1
               else
-                echo "✓ Found:   $F  ($(du -sh $F | cut -f1))"
+                echo "Found: $F ($(du -sh "$F" | cut -f1))"
               fi
             done
           done
+
           if [ $MISSING -eq 1 ]; then
             echo ""
             echo "ERROR: Native deps missing."
@@ -43,13 +44,19 @@ jobs:
             exit 1
           fi
 
-      # ── NDK ───────────────────────────────────────────────────────────────
       - name: Install Android NDK ${{ env.NDK_VERSION }}
         run: |
-          yes | sudo ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager \
-            "ndk;${{ env.NDK_VERSION }}" 2>/dev/null
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
 
-      # ── Flutter ───────────────────────────────────────────────────────────
+          set +e
+          yes | sudo "${SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null
+          set -e
+
+          sudo "${SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" "ndk;${{ env.NDK_VERSION }}"
+          echo "ANDROID_SDK_ROOT=${SDK_ROOT}" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=${SDK_ROOT}/ndk/${{ env.NDK_VERSION }}" >> "$GITHUB_ENV"
+
       - name: Setup Flutter ${{ env.FLUTTER_VERSION }}
         uses: subosito/flutter-action@v2
         with:
@@ -60,47 +67,14 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
-      # ── Keystore (optional — uses debug key if secret not set) ────────────
-      - name: Setup signing keystore
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode \
-            > android/app/cobe-release.jks
-          cat >> android/app/build.gradle.kts << 'KTS'
-
-          // CI injected signing
-          android.signingConfigs.create("release") {
-            storeFile = file("cobe-release.jks")
-            storePassword = System.getenv("KEY_STORE_PASS")
-            keyAlias = System.getenv("KEY_ALIAS")
-            keyPassword = System.getenv("KEY_PASS")
-          }
-          android.buildTypes["release"].signingConfig =
-            android.signingConfigs["release"]
-          KTS
+      - name: Build debug APK
+        run: flutter build apk --debug
         env:
-          KEY_STORE_PASS: ${{ secrets.KEY_STORE_PASS }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASS: ${{ secrets.KEY_PASS }}
-
-      # ── Build ─────────────────────────────────────────────────────────────
-      - name: Build release APK
-        run: |
-          flutter build apk \
-            --release \
-            --split-per-abi \
-            --dart-define=FLUTTER_WEB_USE_SKIA=true
-        env:
-          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION }}
-
-      - name: Build universal APK (fallback)
-        run: flutter build apk --release
-        env:
-          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION }}
-
-      # ── Rename outputs ────────────────────────────────────────────────────
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+          
       - name: Rename APKs
         run: |
+          set -euo pipefail
           VERSION=$(grep "^version:" pubspec.yaml | awk '{print $2}')
           cd build/app/outputs/flutter-apk/
           ls *.apk
@@ -110,20 +84,9 @@ jobs:
           echo "Final APKs:"
           ls *.apk
 
-      # ── Upload ────────────────────────────────────────────────────────────
       - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
-          name: cobe-apk-${{ github.sha }}
+          name: cobe-debug-apk-${{ github.sha }}
           path: build/app/outputs/flutter-apk/*.apk
           retention-days: 60
-
-      # ── Optional: create a GitHub Release on version tags ─────────────────
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: build/app/outputs/flutter-apk/*.apk
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
