@@ -65,8 +65,8 @@ if [ ! -d sqlcipher ]; then
   git clone --depth 1 --branch v4.5.6 https://github.com/sqlcipher/sqlcipher.git
 fi
 
+# Create include dir
 mkdir -p "$OUT/sqlcipher/include"
-cp sqlcipher/sqlite3.h "$OUT/sqlcipher/include/"
 
 for ABI in "${ABIS[@]}"; do
   TRIPLE=$(get_triple "$ABI")
@@ -76,8 +76,12 @@ for ABI in "${ABIS[@]}"; do
   AR="$TOOLCHAIN/bin/llvm-ar"
 
   mkdir -p "$OUT/sqlcipher/$ABI"
+  
+  # Go INTO the cloned directory
   cd sqlcipher
+  
   make clean 2>/dev/null || true
+  
   ./configure \
     --host="${TRIPLE}" \
     CC="$CC" \
@@ -88,12 +92,21 @@ for ABI in "${ABIS[@]}"; do
     --with-crypto-lib=none \
     --disable-shared \
     2>/dev/null
+    
   make libsqlcipher.a 2>/dev/null
+  
+  # Copy the library
   cp .libs/libsqlcipher.a "$OUT/sqlcipher/$ABI/" 2>/dev/null || \
     cp libsqlcipher.a "$OUT/sqlcipher/$ABI/" 2>/dev/null || true
+    
+  # COPY THE HEADER NOW (after it's been confirmed/generated)
+  cp sqlite3.h "$OUT/sqlcipher/include/" 2>/dev/null || true
+  
+  # Go back to $WORK
   cd ..
   echo "    SQLCipher built for $ABI"
 done
+
 
 echo ""
 echo "✓ All dependencies built at: $OUT"
