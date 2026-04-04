@@ -36,9 +36,9 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            autoconf automake libtool tcl pkg-config
+            autoconf automake libtool tcl pkg-config make
 
-      # ── Clone all sources ─────────────────────────────────────────────────
+      # ── Clone all sources ──────────────────────────────────────────────────
       - name: Clone sources
         run: |
           git clone --depth 1 --branch ${{ env.OPENSSL_TAG }} \
@@ -46,7 +46,8 @@ jobs:
 
           git clone --depth 1 --branch ${{ env.SQLCIPHER_TAG }} \
             https://github.com/sqlcipher/sqlcipher.git /tmp/sqlcipher
-          cd /tmp/sqlcipher && autoreconf --install --force 2>/dev/null || true
+          cd /tmp/sqlcipher
+          autoreconf --install --force 2>/dev/null || true
 
           git clone --depth 1 --branch ${{ env.ARGON2_REF }} \
             https://github.com/P-H-C/phc-winner-argon2.git /tmp/argon2
@@ -60,101 +61,142 @@ jobs:
           mkdir -p ${{ env.OUT }}/argon2/include
           cp /tmp/argon2/include/argon2.h ${{ env.OUT }}/argon2/include/
 
+      # ── Shared build function — inlined per ABI to avoid bash export issues ─
+
       # ══════════════════════════════════════════════════════════════════════
       # arm64-v8a
       # ══════════════════════════════════════════════════════════════════════
       - name: Build arm64-v8a
         run: |
+          set -euo pipefail
           ABI="arm64-v8a"
           TRIPLE="aarch64-linux-android"
-          OPENSSL_TARGET="android-arm64"
+          OPENSSL_ARCH="android-arm64"
+
           TOOLCHAIN="${NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64"
+          SYSROOT="${NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
           CC="${TOOLCHAIN}/bin/${TRIPLE}${{ env.API_LEVEL }}-clang"
+          CXX="${TOOLCHAIN}/bin/${TRIPLE}${{ env.API_LEVEL }}-clang++"
           AR="${TOOLCHAIN}/bin/llvm-ar"
           RANLIB="${TOOLCHAIN}/bin/llvm-ranlib"
+          STRIP="${TOOLCHAIN}/bin/llvm-strip"
           OPENSSL_OUT="/tmp/openssl-${ABI}"
 
+          # Verify compiler exists and works
+          echo "--- Compiler check ---"
+          ls "$CC"
+          "$CC" --version
+          echo "----------------------"
+
           # ── OpenSSL ───────────────────────────────────────────────────────
+          echo "Building OpenSSL for ${ABI}..."
           cd /tmp/openssl
           make clean 2>/dev/null || true
-          PATH="${TOOLCHAIN}/bin:$PATH" \
-          ./Configure ${OPENSSL_TARGET} \
+
+          # OpenSSL's Configure handles Android cross-compile natively
+          # ANDROID_NDK_ROOT must be set, PATH must include the toolchain
+          export ANDROID_NDK_ROOT="${NDK_HOME}"
+          export PATH="${TOOLCHAIN}/bin:${PATH}"
+
+          perl Configure ${OPENSSL_ARCH} \
             -D__ANDROID_API__=${{ env.API_LEVEL }} \
             --prefix="${OPENSSL_OUT}" \
-            no-shared no-tests no-ui-console \
-            2>&1 | tail -3
-          PATH="${TOOLCHAIN}/bin:$PATH" \
-          make -j$(nproc) build_libs 2>&1 | tail -5
-          make install_dev 2>&1 | tail -3
+            --openssldir="${OPENSSL_OUT}/ssl" \
+            no-shared no-tests no-ui-console no-asm \
+            2>&1 | tail -5
+
+          make -j$(nproc) build_libs 2>&1 | tail -10
+          make install_dev 2>&1 | tail -5
+          echo "OpenSSL headers: $(ls ${OPENSSL_OUT}/include/openssl/*.h | wc -l) files"
 
           # ── Argon2 ────────────────────────────────────────────────────────
+          echo "Building Argon2 for ${ABI}..."
           mkdir -p ${{ env.OUT }}/argon2/${ABI}
           cd /tmp/argon2
           make clean 2>/dev/null || true
-          CC="$CC" AR="$AR" RANLIB="$RANLIB" \
-          CFLAGS="-O3 -fPIC -DANDROID" \
-            make libargon2.a -j$(nproc)
+          make libargon2.a -j$(nproc) \
+            CC="$CC" AR="$AR" RANLIB="$RANLIB" \
+            CFLAGS="-O3 -fPIC --sysroot=${SYSROOT} -DANDROID"
           cp libargon2.a ${{ env.OUT }}/argon2/${ABI}/
           make clean
 
           # ── SQLCipher ─────────────────────────────────────────────────────
+          echo "Building SQLCipher for ${ABI}..."
           mkdir -p ${{ env.OUT }}/sqlcipher/${ABI}
           cd /tmp/sqlcipher
           make distclean 2>/dev/null || true
+
+          # Key flags for successful cross-compile:
+          # --build=x86_64-linux-gnu        = host machine (runner)
+          # --host=aarch64-linux-android    = target machine
+          # ac_cv_func_* = disable autoconf runtime checks that can't run on target
           ./configure \
+            --build=x86_64-linux-gnu \
             --host="${TRIPLE}" \
-            CC="$CC" AR="$AR" RANLIB="$RANLIB" \
-            CFLAGS="-O3 -fPIC -DSQLITE_HAS_CODEC -DSQLITE_TEMP_STORE=2 -DANDROID -I${OPENSSL_OUT}/include" \
-            LDFLAGS="-L${OPENSSL_OUT}/lib" \
+            CC="${CC} --sysroot=${SYSROOT}" \
+            AR="$AR" \
+            RANLIB="$RANLIB" \
+            CFLAGS="-O3 -fPIC -DSQLITE_HAS_CODEC -DSQLITE_TEMP_STORE=2 -I${OPENSSL_OUT}/include" \
+            LDFLAGS="-L${OPENSSL_OUT}/lib64 -L${OPENSSL_OUT}/lib" \
             LIBS="-lcrypto" \
             --enable-tempstore=yes \
             --with-crypto-lib=openssl \
-            --with-openssl-header-version \
             --disable-shared \
             --enable-static \
-            2>&1 | tail -5
-          make -j$(nproc) 2>&1 | tail -5
+            ac_cv_func_posix_getpwuid_r=no \
+            ac_cv_func_getpwuid_r=no \
+            2>&1 | tail -10
+
+          make -j$(nproc) libsqlcipher.la 2>&1 | tail -10
+
+          # The .a lives in .libs/ after libtool builds it
+          find . -name "libsqlcipher.a" | head -5
           find . -name "libsqlcipher.a" -exec cp {} ${{ env.OUT }}/sqlcipher/${ABI}/ \;
 
-          # sqlite3.h is generated by configure — copy once
+          # Copy generated header (only needed once — same across ABIs)
           mkdir -p ${{ env.OUT }}/sqlcipher/include
           cp sqlite3.h ${{ env.OUT }}/sqlcipher/include/
-          echo "✓ arm64-v8a done"
+          echo "✓ ${ABI} complete"
 
       # ══════════════════════════════════════════════════════════════════════
       # armeabi-v7a
       # ══════════════════════════════════════════════════════════════════════
       - name: Build armeabi-v7a
         run: |
+          set -euo pipefail
           ABI="armeabi-v7a"
           TRIPLE="armv7a-linux-androideabi"
-          OPENSSL_TARGET="android-arm"
+          OPENSSL_ARCH="android-arm"
+
           TOOLCHAIN="${NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64"
+          SYSROOT="${NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
           CC="${TOOLCHAIN}/bin/${TRIPLE}${{ env.API_LEVEL }}-clang"
           AR="${TOOLCHAIN}/bin/llvm-ar"
           RANLIB="${TOOLCHAIN}/bin/llvm-ranlib"
           OPENSSL_OUT="/tmp/openssl-${ABI}"
 
+          export ANDROID_NDK_ROOT="${NDK_HOME}"
+          export PATH="${TOOLCHAIN}/bin:${PATH}"
+
           # ── OpenSSL ───────────────────────────────────────────────────────
           cd /tmp/openssl
           make clean 2>/dev/null || true
-          PATH="${TOOLCHAIN}/bin:$PATH" \
-          ./Configure ${OPENSSL_TARGET} \
+          perl Configure ${OPENSSL_ARCH} \
             -D__ANDROID_API__=${{ env.API_LEVEL }} \
             --prefix="${OPENSSL_OUT}" \
-            no-shared no-tests no-ui-console \
-            2>&1 | tail -3
-          PATH="${TOOLCHAIN}/bin:$PATH" \
-          make -j$(nproc) build_libs 2>&1 | tail -5
-          make install_dev 2>&1 | tail -3
+            --openssldir="${OPENSSL_OUT}/ssl" \
+            no-shared no-tests no-ui-console no-asm \
+            2>&1 | tail -5
+          make -j$(nproc) build_libs 2>&1 | tail -10
+          make install_dev 2>&1 | tail -5
 
           # ── Argon2 ────────────────────────────────────────────────────────
           mkdir -p ${{ env.OUT }}/argon2/${ABI}
           cd /tmp/argon2
           make clean 2>/dev/null || true
-          CC="$CC" AR="$AR" RANLIB="$RANLIB" \
-          CFLAGS="-O2 -fPIC -mthumb -DANDROID" \
-            make libargon2.a -j$(nproc)
+          make libargon2.a -j$(nproc) \
+            CC="$CC" AR="$AR" RANLIB="$RANLIB" \
+            CFLAGS="-O2 -fPIC -mthumb --sysroot=${SYSROOT} -DANDROID"
           cp libargon2.a ${{ env.OUT }}/argon2/${ABI}/
           make clean
 
@@ -163,54 +205,64 @@ jobs:
           cd /tmp/sqlcipher
           make distclean 2>/dev/null || true
           ./configure \
+            --build=x86_64-linux-gnu \
             --host="${TRIPLE}" \
-            CC="$CC" AR="$AR" RANLIB="$RANLIB" \
-            CFLAGS="-O2 -fPIC -mthumb -DSQLITE_HAS_CODEC -DSQLITE_TEMP_STORE=2 -DANDROID -I${OPENSSL_OUT}/include" \
-            LDFLAGS="-L${OPENSSL_OUT}/lib" \
+            CC="${CC} --sysroot=${SYSROOT}" \
+            AR="$AR" \
+            RANLIB="$RANLIB" \
+            CFLAGS="-O2 -fPIC -mthumb -DSQLITE_HAS_CODEC -DSQLITE_TEMP_STORE=2 -I${OPENSSL_OUT}/include" \
+            LDFLAGS="-L${OPENSSL_OUT}/lib64 -L${OPENSSL_OUT}/lib" \
             LIBS="-lcrypto" \
             --enable-tempstore=yes \
             --with-crypto-lib=openssl \
             --disable-shared \
             --enable-static \
-            2>&1 | tail -5
-          make -j$(nproc) 2>&1 | tail -5
+            ac_cv_func_posix_getpwuid_r=no \
+            ac_cv_func_getpwuid_r=no \
+            2>&1 | tail -10
+          make -j$(nproc) libsqlcipher.la 2>&1 | tail -10
           find . -name "libsqlcipher.a" -exec cp {} ${{ env.OUT }}/sqlcipher/${ABI}/ \;
-          echo "✓ armeabi-v7a done"
+          echo "✓ ${ABI} complete"
 
       # ══════════════════════════════════════════════════════════════════════
       # x86_64
       # ══════════════════════════════════════════════════════════════════════
       - name: Build x86_64
         run: |
+          set -euo pipefail
           ABI="x86_64"
           TRIPLE="x86_64-linux-android"
-          OPENSSL_TARGET="android-x86_64"
+          OPENSSL_ARCH="android-x86_64"
+
           TOOLCHAIN="${NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64"
+          SYSROOT="${NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
           CC="${TOOLCHAIN}/bin/${TRIPLE}${{ env.API_LEVEL }}-clang"
           AR="${TOOLCHAIN}/bin/llvm-ar"
           RANLIB="${TOOLCHAIN}/bin/llvm-ranlib"
           OPENSSL_OUT="/tmp/openssl-${ABI}"
 
+          export ANDROID_NDK_ROOT="${NDK_HOME}"
+          export PATH="${TOOLCHAIN}/bin:${PATH}"
+
           # ── OpenSSL ───────────────────────────────────────────────────────
           cd /tmp/openssl
           make clean 2>/dev/null || true
-          PATH="${TOOLCHAIN}/bin:$PATH" \
-          ./Configure ${OPENSSL_TARGET} \
+          perl Configure ${OPENSSL_ARCH} \
             -D__ANDROID_API__=${{ env.API_LEVEL }} \
             --prefix="${OPENSSL_OUT}" \
-            no-shared no-tests no-ui-console \
-            2>&1 | tail -3
-          PATH="${TOOLCHAIN}/bin:$PATH" \
-          make -j$(nproc) build_libs 2>&1 | tail -5
-          make install_dev 2>&1 | tail -3
+            --openssldir="${OPENSSL_OUT}/ssl" \
+            no-shared no-tests no-ui-console no-asm \
+            2>&1 | tail -5
+          make -j$(nproc) build_libs 2>&1 | tail -10
+          make install_dev 2>&1 | tail -5
 
           # ── Argon2 ────────────────────────────────────────────────────────
           mkdir -p ${{ env.OUT }}/argon2/${ABI}
           cd /tmp/argon2
           make clean 2>/dev/null || true
-          CC="$CC" AR="$AR" RANLIB="$RANLIB" \
-          CFLAGS="-O3 -fPIC -DANDROID" \
-            make libargon2.a -j$(nproc)
+          make libargon2.a -j$(nproc) \
+            CC="$CC" AR="$AR" RANLIB="$RANLIB" \
+            CFLAGS="-O3 -fPIC --sysroot=${SYSROOT} -DANDROID"
           cp libargon2.a ${{ env.OUT }}/argon2/${ABI}/
           make clean
 
@@ -219,19 +271,24 @@ jobs:
           cd /tmp/sqlcipher
           make distclean 2>/dev/null || true
           ./configure \
+            --build=x86_64-linux-gnu \
             --host="${TRIPLE}" \
-            CC="$CC" AR="$AR" RANLIB="$RANLIB" \
-            CFLAGS="-O3 -fPIC -DSQLITE_HAS_CODEC -DSQLITE_TEMP_STORE=2 -DANDROID -I${OPENSSL_OUT}/include" \
-            LDFLAGS="-L${OPENSSL_OUT}/lib" \
+            CC="${CC} --sysroot=${SYSROOT}" \
+            AR="$AR" \
+            RANLIB="$RANLIB" \
+            CFLAGS="-O3 -fPIC -DSQLITE_HAS_CODEC -DSQLITE_TEMP_STORE=2 -I${OPENSSL_OUT}/include" \
+            LDFLAGS="-L${OPENSSL_OUT}/lib64 -L${OPENSSL_OUT}/lib" \
             LIBS="-lcrypto" \
             --enable-tempstore=yes \
             --with-crypto-lib=openssl \
             --disable-shared \
             --enable-static \
-            2>&1 | tail -5
-          make -j$(nproc) 2>&1 | tail -5
+            ac_cv_func_posix_getpwuid_r=no \
+            ac_cv_func_getpwuid_r=no \
+            2>&1 | tail -10
+          make -j$(nproc) libsqlcipher.la 2>&1 | tail -10
           find . -name "libsqlcipher.a" -exec cp {} ${{ env.OUT }}/sqlcipher/${ABI}/ \;
-          echo "✓ x86_64 done"
+          echo "✓ ${ABI} complete"
 
       # ── Verify ────────────────────────────────────────────────────────────
       - name: Verify outputs
