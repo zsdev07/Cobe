@@ -25,6 +25,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <cmath>
 
 #include <argon2.h>
 #include <sqlite3.h>
