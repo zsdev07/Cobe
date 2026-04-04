@@ -24,6 +24,12 @@ target_include_directories(sqlcipher INTERFACE
     "${THIRD_PARTY_DIR}/sqlcipher/include"
 )
 
+# ── OpenSSL libcrypto (required by current SQLCipher static builds) ────────
+add_library(crypto STATIC IMPORTED)
+set_target_properties(crypto PROPERTIES
+    IMPORTED_LOCATION "${THIRD_PARTY_DIR}/openssl/${ANDROID_ABI}/libcrypto.a"
+)
+
 # ── Argon2 ─────────────────────────────────────────────────────────────────
 add_library(argon2 STATIC IMPORTED)
 set_target_properties(argon2 PROPERTIES
@@ -56,6 +62,7 @@ target_compile_definitions(cobe_engine PRIVATE
 
 target_link_libraries(cobe_engine PRIVATE
     sqlcipher
+    crypto
     argon2
     fmt
     android
