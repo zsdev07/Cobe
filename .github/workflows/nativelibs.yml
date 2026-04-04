@@ -1,35 +1,43 @@
 name: Build Native Dependencies
 
 on:
-  workflow_dispatch: # Allows you to run this manually from the Actions tab
+  workflow_dispatch: # Allows manual trigger from GitHub UI
   push:
     paths:
-      - 'scripts/build_deps' # Runs if you update the build script
+      - 'scripts/build_deps.sh' # Runs if you update the script
 
 jobs:
-  build-libs:
+  build:
     runs-on: ubuntu-latest
     
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r27d # Using latest stable r27
+          add-to-path: true
 
-      - name: Build Libraries via Docker
+      - name: Run Build Script
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
-          # Matches the "Quick Docker Build" command from your README
-          docker run --rm -v $(pwd):/work ghcr.io/android-ndk/android-ndk:r27 \
-            bash /work/scripts/build_deps
+          # Ensure the script is executable
+          chmod +x scripts/build_deps.sh
+          # Run it
+          ./scripts/build_deps.sh
             
-      - name: Verify Files
+      - name: Verify Compiled Libraries
         run: |
-          echo "Checking if libraries were created..."
+          echo "Verifying output in src/cpp/third_party:"
           ls -R src/cpp/third_party/
 
-      - name: Commit and Push Libraries
+      - name: Commit and Push Changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore: auto-generate native static libraries"
+          commit_message: "chore: build native static libraries (SQLCipher, Argon2, fmt)"
           file_pattern: 'src/cpp/third_party/**'
+          
