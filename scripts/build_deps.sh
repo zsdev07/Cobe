@@ -5,8 +5,11 @@ set -euo pipefail
 
 NDK="${ANDROID_NDK_HOME:-$HOME/Android/Sdk/ndk/27.0.12077973}"
 ABIS=("arm64-v8a" "armeabi-v7a" "x86_64")
-OUT="$(dirname "$0")/../src/cpp/third_party"
+# Get the absolute path to the project root
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+OUT="$PROJECT_ROOT/src/cpp/third_party"
 WORK="/tmp/cobe_deps"
+
 
 mkdir -p "$WORK" && cd "$WORK"
 
