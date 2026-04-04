@@ -43,12 +43,19 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
 
   String _currentLine() {
     try {
-      final sel = _codeCtrl.selection;
+      final selection = _codeCtrl.selection;
       final text = _codeCtrl.text;
-      final start = text.lastIndexOf('\n', sel.start - 1) + 1;
-      final end = text.indexOf('\n', sel.start);
-      return text.substring(start, end < 0 ? text.length : end);
-    } catch (_) { return ''; }
+      final lines = text.split('\n');
+
+      final lineIndex = selection.startIndex;
+      if (lineIndex < 0 || lineIndex >= lines.length) {
+        return '';
+      }
+
+      return lines[lineIndex];
+    } catch (_) {
+      return '';
+    }
   }
 
   void _onLogoPressCount() {
@@ -74,11 +81,11 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final editorState  = ref.watch(fileEditorProvider);
-    final aiState      = ref.watch(aiProvider);
-    final indexing     = ref.watch(indexingProvider);
-    final panic        = ref.watch(panicProvider);
-    final statusMsg    = ref.watch(engineStatusProvider).value ?? 'Ready';
+    final editorState = ref.watch(fileEditorProvider);
+    final aiState = ref.watch(aiProvider);
+    final indexing = ref.watch(indexingProvider);
+    final panic = ref.watch(panicProvider);
+    final statusMsg = ref.watch(engineStatusProvider).value ?? 'Ready';
 
     return Scaffold(
       backgroundColor: CobeColors.bg,
@@ -86,17 +93,19 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         children: [
           Column(
             children: [
-              // ── Top Bar ──────────────────────────────────────────────
               _TopBar(
                 filePath: editorState.path,
                 dirty: editorState.dirty,
                 onLogoTap: _onLogoPressCount,
                 onLogoLongPress: () => triggerPanic(ref),
                 onSave: () => ref.read(fileEditorProvider.notifier).save(),
-                onSettings: () => Navigator.push(context, MaterialPageRoute(
-                    builder: (_) => const ProviderSettingsScreen())),
+                onSettings: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ProviderSettingsScreen(),
+                  ),
+                ),
               ),
-              // ── Editor + Artifacts Row ────────────────────────────────
               Expanded(
                 child: Row(
                   children: [
@@ -109,7 +118,6 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                         ),
                       ),
                     ),
-                    // Artifacts side panel
                     SizedBox(
                       width: 28,
                       child: Align(
@@ -120,9 +128,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                   ],
                 ),
               ),
-              // ── AI Prompt Bar ─────────────────────────────────────────
               _AiBar(aiState: aiState),
-              // ── Status Bar ────────────────────────────────────────────
               CobeStatusBar(
                 message: indexing.active
                     ? 'Indexing: ${indexing.currentFile}'
@@ -131,18 +137,14 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
               ),
             ],
           ),
-          // ── Hover Menu ────────────────────────────────────────────────
           Positioned.fill(child: Stack(children: const [HoverMenu()])),
-          // ── Frost Overlay (Panic) ─────────────────────────────────────
-          if (panic)
-            Positioned.fill(child: FrostOverlay(active: panic)),
+          if (panic) Positioned.fill(child: FrostOverlay(active: panic)),
         ],
       ),
     );
   }
 }
 
-// ── Top Bar ──────────────────────────────────────────────────────────────
 class _TopBar extends StatelessWidget {
   final String filePath;
   final bool dirty;
@@ -165,30 +167,36 @@ class _TopBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         children: [
-          // Logo — panic trigger
           GestureDetector(
             onTap: onLogoTap,
             onLongPress: onLogoLongPress,
             child: Container(
-              width: 28, height: 28,
+              width: 28,
+              height: 28,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: const SweepGradient(
-                  colors: [CobeColors.pulse, CobeColors.accent, CobeColors.pulse],
+                  colors: [
+                    CobeColors.pulse,
+                    CobeColors.accent,
+                    CobeColors.pulse,
+                  ],
                 ),
               ),
               child: const Center(
-                child: Text('C',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'JetBrainsMono',
-                        fontSize: 14)),
+                child: Text(
+                  'C',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'JetBrainsMono',
+                    fontSize: 14,
+                  ),
+                ),
               ),
             ),
           ),
           const SizedBox(width: 10),
-          // File path + dirty dot
           Expanded(
             child: Row(
               children: [
@@ -204,17 +212,22 @@ class _TopBar extends StatelessWidget {
               ],
             ),
           ),
-          // Save + Settings
           IconButton(
-            icon: const Icon(Icons.save_outlined,
-                size: 18, color: CobeColors.textSub),
+            icon: const Icon(
+              Icons.save_outlined,
+              size: 18,
+              color: CobeColors.textSub,
+            ),
             onPressed: onSave,
             tooltip: 'Save (Ctrl+S)',
             padding: EdgeInsets.zero,
           ),
           IconButton(
-            icon: const Icon(Icons.tune_rounded,
-                size: 18, color: CobeColors.textSub),
+            icon: const Icon(
+              Icons.tune_rounded,
+              size: 18,
+              color: CobeColors.textSub,
+            ),
             onPressed: onSettings,
             padding: EdgeInsets.zero,
           ),
@@ -224,7 +237,6 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-// ── Code Editor ───────────────────────────────────────────────────────────
 class _CodeEditor extends StatelessWidget {
   final CodeLineEditingController ctrl;
   final String ghostText;
@@ -242,21 +254,21 @@ class _CodeEditor extends StatelessWidget {
         backgroundColor: CobeColors.bg,
         selectionColor: CobeColors.pulse.withOpacity(0.3),
         cursorColor: CobeColors.accent,
-        gutterStyle: const CodeGutterStyle(
-          backgroundColor: Color(0xFF060810),
-          textColor: CobeColors.textSub,
-          width: 48,
-        ),
+        chunkIndicatorColor: CobeColors.textSub,
       ),
-      indicatorBuilder: (_, controller, chunkController, notifier) =>
-          Row(children: [
-        DefaultCodeLineNumber(
-            controller: controller, notifier: notifier),
-        DefaultCodeChunkIndicator(
+      indicatorBuilder: (_, controller, chunkController, notifier) => Row(
+        children: [
+          DefaultCodeLineNumber(
+            controller: controller,
+            notifier: notifier,
+          ),
+          DefaultCodeChunkIndicator(
             width: 16,
             controller: chunkController,
-            notifier: notifier),
-      ]),
+            notifier: notifier,
+          ),
+        ],
+      ),
       scrollbarBuilder: (_, child, details) => Scrollbar(
         thumbVisibility: true,
         thickness: 4,
@@ -266,10 +278,10 @@ class _CodeEditor extends StatelessWidget {
   }
 }
 
-// ── AI Prompt Bar ─────────────────────────────────────────────────────────
 class _AiBar extends ConsumerStatefulWidget {
   final AiState aiState;
   const _AiBar({required this.aiState});
+
   @override
   ConsumerState<_AiBar> createState() => _AiBarState();
 }
@@ -278,7 +290,10 @@ class _AiBarState extends ConsumerState<_AiBar> {
   final _ctrl = TextEditingController();
 
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   void _submit() {
     if (_ctrl.text.trim().isEmpty) return;
@@ -313,15 +328,21 @@ class _AiBarState extends ConsumerState<_AiBar> {
           ),
           if (thinking)
             const SizedBox(
-              width: 16, height: 16,
+              width: 16,
+              height: 16,
               child: CircularProgressIndicator(
-                  strokeWidth: 1.5, color: CobeColors.pulse),
+                strokeWidth: 1.5,
+                color: CobeColors.pulse,
+              ),
             )
           else
             GestureDetector(
               onTap: _submit,
-              child: const Icon(Icons.arrow_upward_rounded,
-                  size: 18, color: CobeColors.pulse),
+              child: const Icon(
+                Icons.arrow_upward_rounded,
+                size: 18,
+                color: CobeColors.pulse,
+              ),
             ),
         ],
       ),
