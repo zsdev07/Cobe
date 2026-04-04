@@ -72,40 +72,45 @@ for ABI in "${ABIS[@]}"; do
   TRIPLE=$(get_triple "$ABI")
   API=$(get_api)
   TOOLCHAIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64"
-  CC="$TOOLCHAIN/bin/${TRIPLE}${API}-clang"
-  AR="$TOOLCHAIN/bin/llvm-ar"
+  
+  # Explicitly define the full toolchain
+  export CC="$TOOLCHAIN/bin/${TRIPLE}${API}-clang"
+  export AR="$TOOLCHAIN/bin/llvm-ar"
+  export AS="$TOOLCHAIN/bin/${TRIPLE}${API}-clang"
+  export RANLIB="$TOOLCHAIN/bin/llvm-ranlib"
+  export STRIP="$TOOLCHAIN/bin/llvm-strip"
 
   mkdir -p "$OUT/sqlcipher/$ABI"
-  
-  # Go INTO the cloned directory
   cd sqlcipher
   
-  make clean 2>/dev/null || true
+  echo "    Cleaning $ABI..."
+  make clean > /dev/null 2>&1 || true
   
+  echo "    Configuring $ABI..."
   ./configure \
     --host="${TRIPLE}" \
-    CC="$CC" \
-    AR="$AR" \
-    CFLAGS="-DSQLITE_HAS_CODEC -DSQLITE_TEMP_STORE=2 -O3 -fPIC" \
-    LDFLAGS="-lm" \
+    --with-pic \
+    --disable-tcl \
+    --disable-shared \
+    --enable-static \
     --enable-tempstore=yes \
     --with-crypto-lib=none \
-    --disable-shared \
-    2>/dev/null
-    
-  make libsqlcipher.a 2>/dev/null
-  
-  # Copy the library
+    CFLAGS="-DSQLITE_HAS_CODEC -DSQLITE_TEMP_STORE=2 -O3 -fPIC" \
+    LDFLAGS="-lm"
+
+  echo "    Compiling $ABI..."
+  # Removed 2>/dev/null so we can see errors if it fails
+  make libsqlcipher.a -j$(nproc)
+
   cp .libs/libsqlcipher.a "$OUT/sqlcipher/$ABI/" 2>/dev/null || \
     cp libsqlcipher.a "$OUT/sqlcipher/$ABI/" 2>/dev/null || true
     
-  # COPY THE HEADER NOW (after it's been confirmed/generated)
   cp sqlite3.h "$OUT/sqlcipher/include/" 2>/dev/null || true
   
-  # Go back to $WORK
   cd ..
-  echo "    SQLCipher built for $ABI"
+  echo "    ✓ SQLCipher built for $ABI"
 done
+
 
 
 echo ""
