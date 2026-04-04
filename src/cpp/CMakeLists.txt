@@ -11,44 +11,42 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     add_link_options(-flto)
 endif()
 
-# ── Android NDK paths ──────────────────────────────────────────────────────
+# ── Paths ──────────────────────────────────────────────────────────────────
+# CMAKE_SOURCE_DIR here is already: .../src/cpp
 set(THIRD_PARTY_DIR "${CMAKE_SOURCE_DIR}/third_party")
 
 # ── SQLCipher (pre-built .a for Android ABI) ───────────────────────────────
-# Place libsqlcipher.a at: third_party/sqlcipher/${ANDROID_ABI}/libsqlcipher.a
 add_library(sqlcipher STATIC IMPORTED)
 set_target_properties(sqlcipher PROPERTIES
-    IMPORTED_LOCATION
-        "${THIRD_PARTY_DIR}/sqlcipher/${ANDROID_ABI}/libsqlcipher.a"
+    IMPORTED_LOCATION "${THIRD_PARTY_DIR}/sqlcipher/${ANDROID_ABI}/libsqlcipher.a"
 )
 target_include_directories(sqlcipher INTERFACE
     "${THIRD_PARTY_DIR}/sqlcipher/include"
 )
 
-# ── Argon2 ────────────────────────────────────────────────────────────────
-# Place libargon2.a at: third_party/argon2/${ANDROID_ABI}/libargon2.a
+# ── Argon2 ─────────────────────────────────────────────────────────────────
 add_library(argon2 STATIC IMPORTED)
 set_target_properties(argon2 PROPERTIES
-    IMPORTED_LOCATION
-        "${THIRD_PARTY_DIR}/argon2/${ANDROID_ABI}/libargon2.a"
+    IMPORTED_LOCATION "${THIRD_PARTY_DIR}/argon2/${ANDROID_ABI}/libargon2.a"
 )
 target_include_directories(argon2 INTERFACE
     "${THIRD_PARTY_DIR}/argon2/include"
 )
 
-# ── LibFormat (header-only via fmtlib) ────────────────────────────────────
-# Place fmt headers at: third_party/fmt/include/fmt/...
+# ── fmt (header-only) ──────────────────────────────────────────────────────
 add_library(fmt INTERFACE)
-target_include_directories(fmt INTERFACE "${THIRD_PARTY_DIR}/fmt/include")
+target_include_directories(fmt INTERFACE
+    "${THIRD_PARTY_DIR}/fmt/include"
+)
 
-# ── Engine shared library ─────────────────────────────────────────────────
+# ── Engine shared library ──────────────────────────────────────────────────
 add_library(cobe_engine SHARED
-    src/cpp/engine.cpp
-    src/cpp/ffi_exports.cpp
+    engine.cpp
+    ffi_exports.cpp
 )
 
 target_include_directories(cobe_engine PRIVATE
-    "${CMAKE_SOURCE_DIR}/src/cpp"
+    "${CMAKE_SOURCE_DIR}"
 )
 
 target_compile_definitions(cobe_engine PRIVATE
@@ -56,16 +54,14 @@ target_compile_definitions(cobe_engine PRIVATE
     SQLITE_TEMP_STORE=2
 )
 
-target_link_libraries(cobe_engine
-    PRIVATE
-        sqlcipher
-        argon2
-        fmt
-        android
-        log
+target_link_libraries(cobe_engine PRIVATE
+    sqlcipher
+    argon2
+    fmt
+    android
+    log
 )
 
-# Symbol visibility: export only cobe_* C symbols
 set_target_properties(cobe_engine PROPERTIES
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
