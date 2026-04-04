@@ -1,17 +1,244 @@
-name: Fetch Native Dependencies
-on: [workflow_dispatch]
+name: Build Native Dependencies
+
+on:
+  workflow_dispatch:  # run manually from GitHub UI
+  push:  
+    paths:
+      - '.github/workflows/build_deps.yml'
+      - 'src/cpp/CMakeLists.txt'
+      - 'src/cpp/engine.h'
 
 jobs:
-  fetch-libs:
-    runs-on: ubuntu-latest
+  build-deps:
+    name: Compile SQLCipher + Argon2 → Android ABIs
+    runs-on: ubuntu-22.04
+
+    env:
+      NDK_VERSION: "27.0.12077973"
+      API_LEVEL: "26"
+      SQLCIPHER_TAG: "v4.5.7"
+      ARGON2_REF: "20190702"         # stable release tag
+      FMT_TAG: "10.2.1"
+
+      # Exact paths CMakeLists.txt expects
+      OUT: ${{ github.workspace }}/src/cpp/third_party
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Run Fetch Script
+      # ── Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── NDK ───────────────────────────────────────────────────────────────
+      - name: Install Android NDK ${{ env.NDK_VERSION }}
         run: |
-          chmod +x scripts/build_deps.sh
-          ./scripts/build_deps.sh
-      - name: Commit Files
-        uses: stefanzweifel/git-auto-commit-action@v5
+          yes | sudo ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager \
+            "ndk;${{ env.NDK_VERSION }}" 2>/dev/null
+          echo "NDK_HOME=${ANDROID_HOME}/ndk/${{ env.NDK_VERSION }}" >> $GITHUB_ENV
+
+      # ── System deps ───────────────────────────────────────────────────────
+      - name: Install build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            autoconf automake libtool tcl pkg-config
+
+      # ── Fetch sources ─────────────────────────────────────────────────────
+      - name: Clone SQLCipher ${{ env.SQLCIPHER_TAG }}
+        run: |
+          git clone --depth 1 --branch ${{ env.SQLCIPHER_TAG }} \
+            https://github.com/sqlcipher/sqlcipher.git /tmp/sqlcipher
+
+      - name: Clone Argon2 ${{ env.ARGON2_REF }}
+        run: |
+          git clone --depth 1 --branch ${{ env.ARGON2_REF }} \
+            https://github.com/P-H-C/phc-winner-argon2.git /tmp/argon2
+
+      - name: Fetch fmtlib headers ${{ env.FMT_TAG }}
+        run: |
+          git clone --depth 1 --branch ${{ env.FMT_TAG }} \
+            https://github.com/fmtlib/fmt.git /tmp/fmt
+          mkdir -p ${{ env.OUT }}/fmt/include
+          cp -r /tmp/fmt/include/fmt ${{ env.OUT }}/fmt/include/
+          echo "✓ fmtlib headers installed"
+
+      # ── Copy headers ──────────────────────────────────────────────────────
+      - name: Copy headers
+        run: |
+          mkdir -p ${{ env.OUT }}/sqlcipher/include
+          mkdir -p ${{ env.OUT }}/argon2/include
+          cp /tmp/sqlcipher/sqlite3.h   ${{ env.OUT }}/sqlcipher/include/
+          cp /tmp/argon2/include/argon2.h ${{ env.OUT }}/argon2/include/
+
+      # ══════════════════════════════════════════════════════════════════════
+      # BUILD LOOP — arm64-v8a
+      # ══════════════════════════════════════════════════════════════════════
+      - name: Build arm64-v8a
+        run: |
+          ABI="arm64-v8a"
+          TRIPLE="aarch64-linux-android"
+          TOOLCHAIN="${NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64"
+          CC="${TOOLCHAIN}/bin/${TRIPLE}${{ env.API_LEVEL }}-clang"
+          AR="${TOOLCHAIN}/bin/llvm-ar"
+          RANLIB="${TOOLCHAIN}/bin/llvm-ranlib"
+          STRIP="${TOOLCHAIN}/bin/llvm-strip"
+
+          mkdir -p ${{ env.OUT }}/argon2/${ABI}
+          mkdir -p ${{ env.OUT }}/sqlcipher/${ABI}
+
+          # ── Argon2 ──────────────────────────────────────────────────────
+          cd /tmp/argon2
+          make clean 2>/dev/null || true
+          CC="$CC" AR="$AR" RANLIB="$RANLIB" \
+          CFLAGS="-O3 -fPIC -DANDROID" \
+            make libargon2.a -j$(nproc)
+          cp libargon2.a ${{ env.OUT }}/argon2/${ABI}/
+          make clean
+
+          # ── SQLCipher ────────────────────────────────────────────────────
+          cd /tmp/sqlcipher
+          make clean 2>/dev/null || true
+          ./configure \
+            --host="${TRIPLE}" \
+            CC="$CC" AR="$AR" RANLIB="$RANLIB" \
+            CFLAGS="-O3 -fPIC -DSQLITE_HAS_CODEC -DSQLITE_TEMP_STORE=2 -DANDROID" \
+            LDFLAGS="" \
+            --enable-tempstore=yes \
+            --with-crypto-lib=none \
+            --disable-shared \
+            --enable-static \
+            2>&1 | tail -5
+          make -j$(nproc) 2>&1 | tail -5
+          # SQLCipher puts the .a in .libs/
+          find . -name "libsqlcipher.a" -exec cp {} ${{ env.OUT }}/sqlcipher/${ABI}/ \;
+          echo "✓ arm64-v8a done"
+
+      # ══════════════════════════════════════════════════════════════════════
+      # BUILD LOOP — armeabi-v7a
+      # ══════════════════════════════════════════════════════════════════════
+      - name: Build armeabi-v7a
+        run: |
+          ABI="armeabi-v7a"
+          TRIPLE="armv7a-linux-androideabi"
+          TOOLCHAIN="${NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64"
+          CC="${TOOLCHAIN}/bin/${TRIPLE}${{ env.API_LEVEL }}-clang"
+          AR="${TOOLCHAIN}/bin/llvm-ar"
+          RANLIB="${TOOLCHAIN}/bin/llvm-ranlib"
+
+          mkdir -p ${{ env.OUT }}/argon2/${ABI}
+          mkdir -p ${{ env.OUT }}/sqlcipher/${ABI}
+
+          # ── Argon2 ──────────────────────────────────────────────────────
+          cd /tmp/argon2
+          make clean 2>/dev/null || true
+          CC="$CC" AR="$AR" RANLIB="$RANLIB" \
+          CFLAGS="-O2 -fPIC -mthumb -DANDROID" \
+            make libargon2.a -j$(nproc)
+          cp libargon2.a ${{ env.OUT }}/argon2/${ABI}/
+          make clean
+
+          # ── SQLCipher ────────────────────────────────────────────────────
+          cd /tmp/sqlcipher
+          make clean 2>/dev/null || true
+          ./configure \
+            --host="${TRIPLE}" \
+            CC="$CC" AR="$AR" RANLIB="$RANLIB" \
+            CFLAGS="-O2 -fPIC -mthumb -DSQLITE_HAS_CODEC -DSQLITE_TEMP_STORE=2 -DANDROID" \
+            LDFLAGS="" \
+            --enable-tempstore=yes \
+            --with-crypto-lib=none \
+            --disable-shared \
+            --enable-static \
+            2>&1 | tail -5
+          make -j$(nproc) 2>&1 | tail -5
+          find . -name "libsqlcipher.a" -exec cp {} ${{ env.OUT }}/sqlcipher/${ABI}/ \;
+          echo "✓ armeabi-v7a done"
+
+      # ══════════════════════════════════════════════════════════════════════
+      # BUILD LOOP — x86_64
+      # ══════════════════════════════════════════════════════════════════════
+      - name: Build x86_64
+        run: |
+          ABI="x86_64"
+          TRIPLE="x86_64-linux-android"
+          TOOLCHAIN="${NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64"
+          CC="${TOOLCHAIN}/bin/${TRIPLE}${{ env.API_LEVEL }}-clang"
+          AR="${TOOLCHAIN}/bin/llvm-ar"
+          RANLIB="${TOOLCHAIN}/bin/llvm-ranlib"
+
+          mkdir -p ${{ env.OUT }}/argon2/${ABI}
+          mkdir -p ${{ env.OUT }}/sqlcipher/${ABI}
+
+          # ── Argon2 ──────────────────────────────────────────────────────
+          cd /tmp/argon2
+          make clean 2>/dev/null || true
+          CC="$CC" AR="$AR" RANLIB="$RANLIB" \
+          CFLAGS="-O3 -fPIC -DANDROID" \
+            make libargon2.a -j$(nproc)
+          cp libargon2.a ${{ env.OUT }}/argon2/${ABI}/
+          make clean
+
+          # ── SQLCipher ────────────────────────────────────────────────────
+          cd /tmp/sqlcipher
+          make clean 2>/dev/null || true
+          ./configure \
+            --host="${TRIPLE}" \
+            CC="$CC" AR="$AR" RANLIB="$RANLIB" \
+            CFLAGS="-O3 -fPIC -DSQLITE_HAS_CODEC -DSQLITE_TEMP_STORE=2 -DANDROID" \
+            LDFLAGS="" \
+            --enable-tempstore=yes \
+            --with-crypto-lib=none \
+            --disable-shared \
+            --enable-static \
+            2>&1 | tail -5
+          make -j$(nproc) 2>&1 | tail -5
+          find . -name "libsqlcipher.a" -exec cp {} ${{ env.OUT }}/sqlcipher/${ABI}/ \;
+          echo "✓ x86_64 done"
+
+      # ── Verify all .a files exist ─────────────────────────────────────────
+      - name: Verify outputs
+        run: |
+          echo "=== Built artifacts ==="
+          for ABI in arm64-v8a armeabi-v7a x86_64; do
+            for LIB in sqlcipher argon2; do
+              FILE="${{ env.OUT }}/${LIB}/${ABI}/lib${LIB}.a"
+              if [ -f "$FILE" ]; then
+                SIZE=$(du -sh "$FILE" | cut -f1)
+                echo "  ✓ ${LIB}/${ABI}/lib${LIB}.a  (${SIZE})"
+              else
+                echo "  ✗ MISSING: ${LIB}/${ABI}/lib${LIB}.a"
+                exit 1
+              fi
+            done
+          done
+          echo ""
+          echo "  ✓ fmtlib headers: $(ls ${{ env.OUT }}/fmt/include/fmt/*.h | wc -l) headers"
+
+      # ── Commit .a files back into the repo ────────────────────────────────
+      - name: Commit native libs to repository
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add src/cpp/third_party/
+
+          # Only commit if something actually changed
+          if git diff --staged --quiet; then
+            echo "No changes to commit — libs are already up to date."
+          else
+            git commit -m "ci: build native deps [SQLCipher ${{ env.SQLCIPHER_TAG }} / Argon2 ${{ env.ARGON2_REF }} / fmt ${{ env.FMT_TAG }}]
+
+            Built for: arm64-v8a, armeabi-v7a, x86_64
+            NDK: ${{ env.NDK_VERSION }}  API: ${{ env.API_LEVEL }}
+            Runner: ubuntu-22.04
+            Triggered by: ${{ github.actor }}"
+            git push
+          fi
+
+      # ── Upload as artifacts too (useful for inspection / manual download) ─
+      - name: Upload libs as workflow artifact
+        uses: actions/upload-artifact@v4
         with:
-          commit_message: "chore: add pre-built native binaries"
+          name: cobe-native-libs
+          path: src/cpp/third_party/
+          retention-days: 30
           
