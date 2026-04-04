@@ -1,0 +1,35 @@
+name: Build Native Dependencies
+
+on:
+  workflow_dispatch: # Allows you to run this manually from the Actions tab
+  push:
+    paths:
+      - 'scripts/build_deps' # Runs if you update the build script
+
+jobs:
+  build-libs:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Libraries via Docker
+        run: |
+          # Matches the "Quick Docker Build" command from your README
+          docker run --rm -v $(pwd):/work ghcr.io/android-ndk/android-ndk:r27 \
+            bash /work/scripts/build_deps
+            
+      - name: Verify Files
+        run: |
+          echo "Checking if libraries were created..."
+          ls -R src/cpp/third_party/
+
+      - name: Commit and Push Libraries
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: auto-generate native static libraries"
+          file_pattern: 'src/cpp/third_party/**'
