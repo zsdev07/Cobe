@@ -1,4 +1,4 @@
-// main.dart — Cobe entry point
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -19,16 +19,6 @@ Future<void> main() async {
 
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
-  ffi.load();
-
-  final dir = await getApplicationDocumentsDirectory();
-  final dbPath = '${dir.path}/cobe.db';
-  ffi.init(dbPath, 'cobe_master_v1');
-
-  if (Platform.isAndroid) {
-    ffi.scanProject(dir.path);
-  }
-
   runApp(const ProviderScope(child: CobeApp()));
 }
 
@@ -41,7 +31,103 @@ class CobeApp extends StatelessWidget {
       title: 'Cobe',
       debugShowCheckedModeBanner: false,
       theme: cobeTheme(),
-      home: const EditorScreen(),
+      home: const _BootstrapScreen(),
+    );
+  }
+}
+
+class _BootstrapScreen extends StatefulWidget {
+  const _BootstrapScreen();
+
+  @override
+  State<_BootstrapScreen> createState() => _BootstrapScreenState();
+}
+
+class _BootstrapScreenState extends State<_BootstrapScreen> {
+  String status = 'Starting Cobe...';
+  bool failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    scheduleMicrotask(_boot);
+  }
+
+  Future<void> _boot() async {
+    try {
+      setState(() => status = 'Loading native engine...');
+      ffi.load();
+
+      final dir = await getApplicationDocumentsDirectory();
+      final dbPath = '${dir.path}/cobe.db';
+
+      setState(() => status = 'Initializing database...');
+      final ok = ffi.init(dbPath, 'cobe_master_v1');
+
+      if (!ok) {
+        throw Exception('ffi.init() returned false');
+      }
+
+      // Delay scan until first UI frame is already shown
+      if (Platform.isAndroid) {
+        unawaited(Future<void>.delayed(const Duration(milliseconds: 500), () async {
+          try {
+            ffi.scanProject(dir.path);
+          } catch (_) {}
+        }));
+      }
+
+      if (!mounted) return;
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const EditorScreen()),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        failed = true;
+        status = 'Startup failed: $e';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF050709),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 20),
+              Text(
+                status,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                ),
+              ),
+              if (failed) ...[
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      failed = false;
+                      status = 'Retrying...';
+                    });
+                    _boot();
+                  },
+                  child: const Text('Retry'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
