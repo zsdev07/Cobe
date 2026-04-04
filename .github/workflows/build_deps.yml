@@ -10,7 +10,7 @@ on:
 
 jobs:
   build-deps:
-    name: Compile SQLCipher + Argon2 → Android ABIs
+    name: Compile SQLCipher + Argon2 + OpenSSL → Android ABIs
     runs-on: ubuntu-22.04
 
     env:
@@ -98,6 +98,10 @@ jobs:
           make install_dev
           test -f "${OPENSSL_OUT}/include/openssl/crypto.h"
 
+          mkdir -p "${{ env.OUT }}/openssl/${ABI}"
+          cp "${OPENSSL_OUT}/lib64/libcrypto.a" "${{ env.OUT }}/openssl/${ABI}/libcrypto.a" 2>/dev/null || \
+            cp "${OPENSSL_OUT}/lib/libcrypto.a" "${{ env.OUT }}/openssl/${ABI}/libcrypto.a"
+
           echo ">>> Argon2 ${ABI}"
           mkdir -p "${{ env.OUT }}/argon2/${ABI}"
           cd /tmp/argon2
@@ -171,6 +175,10 @@ jobs:
           make install_dev
           test -f "${OPENSSL_OUT}/include/openssl/crypto.h"
 
+          mkdir -p "${{ env.OUT }}/openssl/${ABI}"
+          cp "${OPENSSL_OUT}/lib64/libcrypto.a" "${{ env.OUT }}/openssl/${ABI}/libcrypto.a" 2>/dev/null || \
+            cp "${OPENSSL_OUT}/lib/libcrypto.a" "${{ env.OUT }}/openssl/${ABI}/libcrypto.a"
+
           echo ">>> Argon2 ${ABI}"
           mkdir -p "${{ env.OUT }}/argon2/${ABI}"
           cd /tmp/argon2
@@ -242,6 +250,10 @@ jobs:
           make install_dev
           test -f "${OPENSSL_OUT}/include/openssl/crypto.h"
 
+          mkdir -p "${{ env.OUT }}/openssl/${ABI}"
+          cp "${OPENSSL_OUT}/lib64/libcrypto.a" "${{ env.OUT }}/openssl/${ABI}/libcrypto.a" 2>/dev/null || \
+            cp "${OPENSSL_OUT}/lib/libcrypto.a" "${{ env.OUT }}/openssl/${ABI}/libcrypto.a"
+
           echo ">>> Argon2 ${ABI}"
           mkdir -p "${{ env.OUT }}/argon2/${ABI}"
           cd /tmp/argon2
@@ -296,6 +308,14 @@ jobs:
                 FAIL=1
               fi
             done
+
+            FILE="${{ env.OUT }}/openssl/${ABI}/libcrypto.a"
+            if [ -f "$FILE" ]; then
+              echo "  OK openssl/${ABI}/libcrypto.a ($(du -sh "$FILE" | cut -f1))"
+            else
+              echo "  MISSING: openssl/${ABI}/libcrypto.a"
+              FAIL=1
+            fi
           done
 
           if [ -f "${{ env.OUT }}/sqlcipher/include/sqlite3.h" ]; then
