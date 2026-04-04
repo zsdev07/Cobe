@@ -98,12 +98,19 @@ for ABI in "${ABIS[@]}"; do
     CFLAGS="-DSQLITE_HAS_CODEC -DSQLITE_TEMP_STORE=2 -O3 -fPIC" \
     LDFLAGS="-lm"
 
-  echo "    Compiling $ABI..."
-  # Removed 2>/dev/null so we can see errors if it fails
-  make libsqlcipher.a -j$(nproc)
+    echo "    Compiling $ABI..."
+  # Changed target to 'all' instead of a specific filename that might not exist in the Makefile
+  make all -j$(nproc)
 
-  cp .libs/libsqlcipher.a "$OUT/sqlcipher/$ABI/" 2>/dev/null || \
-    cp libsqlcipher.a "$OUT/sqlcipher/$ABI/" 2>/dev/null || true
+  # SQLCipher build usually creates 'libsqlite3.la' or '.libs/libsqlite3.a'
+  # We look for the generated static library and copy it as 'libsqlcipher.a'
+  if [ -f .libs/libsqlite3.a ]; then
+    cp .libs/libsqlite3.a "$OUT/sqlcipher/$ABI/libsqlcipher.a"
+  elif [ -f libsqlcipher.a ]; then
+    cp libsqlcipher.a "$OUT/sqlcipher/$ABI/"
+  elif [ -f libsqlite3.a ]; then
+    cp libsqlite3.a "$OUT/sqlcipher/$ABI/libsqlcipher.a"
+  fi
     
   cp sqlite3.h "$OUT/sqlcipher/include/" 2>/dev/null || true
   
