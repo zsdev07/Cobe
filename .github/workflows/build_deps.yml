@@ -30,7 +30,7 @@ jobs:
         run: |
           set -euo pipefail
           yes | sudo "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" \
-            "ndk;${{ env.NDK_VERSION }}" >/dev/null
+          "ndk;${{ env.NDK_VERSION }}" >/dev/null || true
           echo "NDK_HOME=${ANDROID_HOME}/ndk/${{ env.NDK_VERSION }}" >> "$GITHUB_ENV"
 
       - name: Install build tools
