@@ -45,16 +45,17 @@ class _CircularMenu extends StatelessWidget {
 
   static const _items = [
     (Icons.folder_open_rounded, 'Files'),
-    (Icons.smart_toy_outlined,  'AI'),
-    (Icons.terminal_rounded,    'Term'),
-    (Icons.settings_outlined,   'Settings'),
-    (Icons.diff_outlined,       'Diff'),
+    (Icons.smart_toy_outlined, 'AI'),
+    (Icons.terminal_rounded, 'Term'),
+    (Icons.settings_outlined, 'Settings'),
+    (Icons.compare_arrows_rounded, 'Diff'),
   ];
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 130, height: 130,
+      width: 130,
+      height: 130,
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -68,7 +69,7 @@ class _CircularMenu extends StatelessWidget {
             const r = 48.0;
             return Positioned(
               left: 65 + r * math.cos(angle) - 16,
-              top:  65 + r * math.sin(angle) - 16,
+              top: 65 + r * math.sin(angle) - 16,
               child: _MenuBtn(icon: e.value.$1, label: e.value.$2),
             );
           }),
@@ -84,9 +85,9 @@ class _HorizontalMenu extends StatelessWidget {
 
   static const _items = [
     (Icons.folder_open_rounded, 'Files'),
-    (Icons.smart_toy_outlined,  'AI'),
-    (Icons.terminal_rounded,    'Term'),
-    (Icons.settings_outlined,   'Cfg'),
+    (Icons.smart_toy_outlined, 'AI'),
+    (Icons.terminal_rounded, 'Term'),
+    (Icons.settings_outlined, 'Cfg'),
   ];
 
   @override
@@ -120,7 +121,8 @@ class _MenuBtn extends StatelessWidget {
       child: GestureDetector(
         onTap: () {},
         child: Container(
-          width: 32, height: 32,
+          width: 32,
+          height: 32,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: CobeColors.glassDeep,
