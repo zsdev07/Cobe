@@ -1,43 +1,17 @@
-name: Build Native Dependencies
-
-on:
-  workflow_dispatch: # Allows manual trigger from GitHub UI
-  push:
-    paths:
-      - 'scripts/build_deps.sh' # Runs if you update the script
+name: Fetch Native Dependencies
+on: [workflow_dispatch]
 
 jobs:
-  build:
+  fetch-libs:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Android NDK
-        uses: nttld/setup-ndk@v1
-        id: setup-ndk
-        with:
-          ndk-version: r27d # Using latest stable r27
-          add-to-path: true
-
-      - name: Run Build Script
-        env:
-          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+      - uses: actions/checkout@v4
+      - name: Run Fetch Script
         run: |
-          # Ensure the script is executable
           chmod +x scripts/build_deps.sh
-          # Run it
           ./scripts/build_deps.sh
-            
-      - name: Verify Compiled Libraries
-        run: |
-          echo "Verifying output in src/cpp/third_party:"
-          ls -R src/cpp/third_party/
-
-      - name: Commit and Push Changes
+      - name: Commit Files
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore: build native static libraries (SQLCipher, Argon2, fmt)"
-          file_pattern: 'src/cpp/third_party/**'
+          commit_message: "chore: add pre-built native binaries"
           
