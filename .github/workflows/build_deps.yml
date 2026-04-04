@@ -290,29 +290,29 @@ jobs:
             for LIB in sqlcipher argon2; do
               FILE="${{ env.OUT }}/${LIB}/${ABI}/lib${LIB}.a"
               if [ -f "$FILE" ]; then
-                echo "  ✓ ${LIB}/${ABI}/lib${LIB}.a  ($(du -sh "$FILE" | cut -f1))"
+                echo "  OK ${LIB}/${ABI}/lib${LIB}.a ($(du -sh "$FILE" | cut -f1))"
               else
-                echo "  ✗ MISSING: ${LIB}/${ABI}/lib${LIB}.a"
+                echo "  MISSING: ${LIB}/${ABI}/lib${LIB}.a"
                 FAIL=1
               fi
             done
           done
 
           if [ -f "${{ env.OUT }}/sqlcipher/include/sqlite3.h" ]; then
-            echo "  ✓ sqlcipher/include/sqlite3.h"
+            echo "  OK sqlcipher/include/sqlite3.h"
           else
-            echo "  ✗ MISSING: sqlcipher/include/sqlite3.h"
+            echo "  MISSING: sqlcipher/include/sqlite3.h"
             FAIL=1
           fi
 
           if [ -f "${{ env.OUT }}/argon2/include/argon2.h" ]; then
-            echo "  ✓ argon2/include/argon2.h"
+            echo "  OK argon2/include/argon2.h"
           else
-            echo "  ✗ MISSING: argon2/include/argon2.h"
+            echo "  MISSING: argon2/include/argon2.h"
             FAIL=1
           fi
 
-          echo "  ✓ fmtlib: $(ls "${{ env.OUT }}/fmt/include/fmt/"*.h 2>/dev/null | wc -l) headers"
+          echo "  fmt headers: $(ls "${{ env.OUT }}/fmt/include/fmt/"*.h 2>/dev/null | wc -l)"
           exit $FAIL
 
       - name: Commit native libs to repository
@@ -323,13 +323,9 @@ jobs:
           git add src/cpp/third_party/
 
           if git diff --staged --quiet; then
-            echo "No changes — libs already up to date."
+            echo "No changes - libs already up to date."
           else
-            git commit -m "ci: build native deps [SQLCipher ${{ env.SQLCIPHER_TAG }} / Argon2 ${{ env.ARGON2_REF }} / OpenSSL ${{ env.OPENSSL_TAG }}]
-
-ABIs: arm64-v8a, armeabi-v7a, x86_64
-NDK: ${{ env.NDK_VERSION }}  API: ${{ env.API_LEVEL }}
-Triggered by: ${{ github.actor }}"
+            git commit -m "ci: build native deps [SQLCipher ${{ env.SQLCIPHER_TAG }} / Argon2 ${{ env.ARGON2_REF }} / OpenSSL ${{ env.OPENSSL_TAG }}] | ABIs: arm64-v8a, armeabi-v7a, x86_64 | NDK: ${{ env.NDK_VERSION }} API: ${{ env.API_LEVEL }} | Triggered by: ${{ github.actor }}"
             git push
           fi
 
