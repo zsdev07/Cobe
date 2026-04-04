@@ -28,39 +28,42 @@ jobs:
 
       - name: Install Android NDK ${{ env.NDK_VERSION }}
         run: |
-          yes | sudo ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager \
-            "ndk;${{ env.NDK_VERSION }}" 2>/dev/null
-          echo "NDK_HOME=${ANDROID_HOME}/ndk/${{ env.NDK_VERSION }}" >> $GITHUB_ENV
+          set -euo pipefail
+          yes | sudo "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" \
+            "ndk;${{ env.NDK_VERSION }}" >/dev/null
+          echo "NDK_HOME=${ANDROID_HOME}/ndk/${{ env.NDK_VERSION }}" >> "$GITHUB_ENV"
 
       - name: Install build tools
         run: |
+          set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            autoconf automake libtool tcl pkg-config make
+            autoconf automake libtool tcl pkg-config make perl git ca-certificates
 
-      # ── Clone all sources once ─────────────────────────────────────────────
       - name: Clone sources
         run: |
-          git clone --depth 1 --branch ${{ env.OPENSSL_TAG }} \
+          set -euo pipefail
+
+          git clone --depth 1 --branch "${{ env.OPENSSL_TAG }}" \
             https://github.com/openssl/openssl.git /tmp/openssl
 
-          git clone --depth 1 --branch ${{ env.SQLCIPHER_TAG }} \
+          git clone --depth 1 --branch "${{ env.SQLCIPHER_TAG }}" \
             https://github.com/sqlcipher/sqlcipher.git /tmp/sqlcipher
-          cd /tmp/sqlcipher && autoreconf --install --force 2>/dev/null || true
+          cd /tmp/sqlcipher
+          autoreconf --install --force 2>/dev/null || true
 
-          git clone --depth 1 --branch ${{ env.ARGON2_REF }} \
+          git clone --depth 1 --branch "${{ env.ARGON2_REF }}" \
             https://github.com/P-H-C/phc-winner-argon2.git /tmp/argon2
 
-          git clone --depth 1 --branch ${{ env.FMT_TAG }} \
+          git clone --depth 1 --branch "${{ env.FMT_TAG }}" \
             https://github.com/fmtlib/fmt.git /tmp/fmt
 
-          # fmtlib — headers only, install now
-          mkdir -p ${{ env.OUT }}/fmt/include
-          cp -r /tmp/fmt/include/fmt ${{ env.OUT }}/fmt/include/
+          mkdir -p "${{ env.OUT }}/fmt/include"
+          cp -r /tmp/fmt/include/fmt "${{ env.OUT }}/fmt/include/"
 
-          # argon2 header exists in repo, copy now
-          mkdir -p ${{ env.OUT }}/argon2/include
-          cp /tmp/argon2/include/argon2.h ${{ env.OUT }}/argon2/include/
+          mkdir -p "${{ env.OUT }}/argon2/include"
+          test -f /tmp/argon2/include/argon2.h
+          cp /tmp/argon2/include/argon2.h "${{ env.OUT }}/argon2/include/"
 
       # ══════════════════════════════════════════════════════════════════════
       # arm64-v8a
@@ -68,6 +71,7 @@ jobs:
       - name: Build arm64-v8a
         run: |
           set -euo pipefail
+
           ABI="arm64-v8a"
           TRIPLE="aarch64-linux-android"
           OPENSSL_ARCH="android-arm64"
@@ -77,40 +81,36 @@ jobs:
           AR="${TOOLCHAIN}/bin/llvm-ar"
           RANLIB="${TOOLCHAIN}/bin/llvm-ranlib"
           OPENSSL_OUT="/tmp/openssl-${ABI}"
+          ARGON2_CFLAGS="-O3 -fPIC --sysroot=${SYSROOT} -Iinclude -DANDROID"
 
           export ANDROID_NDK_ROOT="${NDK_HOME}"
           export PATH="${TOOLCHAIN}/bin:${PATH}"
 
-          # ── OpenSSL ───────────────────────────────────────────────────────
           echo ">>> OpenSSL ${ABI}"
           cd /tmp/openssl
           make distclean 2>/dev/null || true
-          perl Configure ${OPENSSL_ARCH} \
+          perl Configure "${OPENSSL_ARCH}" \
             -D__ANDROID_API__=${{ env.API_LEVEL }} \
             --prefix="${OPENSSL_OUT}" \
             --openssldir="${OPENSSL_OUT}/ssl" \
-            no-shared no-tests no-ui-console no-asm \
-            2>&1 | tail -3
-          make -j$(nproc) build_libs 2>&1 | tail -3
-          make install_dev 2>&1 | tail -3
-          ls "${OPENSSL_OUT}/include/openssl/crypto.h"
+            no-shared no-tests no-ui-console no-asm
+          make -j"$(nproc)" build_libs
+          make install_dev
+          test -f "${OPENSSL_OUT}/include/openssl/crypto.h"
 
-          # ── Argon2 ────────────────────────────────────────────────────────
-          # Fix: pass -I. so argon2's own sources find argon2.h in the repo root
           echo ">>> Argon2 ${ABI}"
-          mkdir -p ${{ env.OUT }}/argon2/${ABI}
+          mkdir -p "${{ env.OUT }}/argon2/${ABI}"
           cd /tmp/argon2
           make clean 2>/dev/null || true
-          make libargon2.a -j$(nproc) \
-            CC="$CC" AR="$AR" RANLIB="$RANLIB" \
-            CFLAGS="-O3 -fPIC --sysroot=${SYSROOT} -I. -DANDROID"
-          cp libargon2.a ${{ env.OUT }}/argon2/${ABI}/
+          make libargon2.a -j"$(nproc)" \
+            CC="${CC}" \
+            AR="${AR}" \
+            RANLIB="${RANLIB}" \
+            CFLAGS="${ARGON2_CFLAGS}"
+          cp libargon2.a "${{ env.OUT }}/argon2/${ABI}/"
 
-          # ── SQLCipher ─────────────────────────────────────────────────────
-          # Fix: pre-cache all autoconf runtime checks so configure never
-          # attempts to run a cross-compiled test binary on the host.
           echo ">>> SQLCipher ${ABI}"
-          mkdir -p ${{ env.OUT }}/sqlcipher/${ABI}
+          mkdir -p "${{ env.OUT }}/sqlcipher/${ABI}"
           cd /tmp/sqlcipher
           make distclean 2>/dev/null || true
 
@@ -129,15 +129,13 @@ jobs:
             --enable-static \
             ac_cv_func_posix_getpwuid_r=no \
             ac_cv_func_getpwuid_r=no \
-            ac_cv_have_decl_h_errno=no \
-            2>&1 | tail -8
+            ac_cv_have_decl_h_errno=no
 
-          make -j$(nproc) libsqlcipher.la 2>&1 | tail -5
-          find . -name "libsqlcipher.a" -exec cp {} ${{ env.OUT }}/sqlcipher/${ABI}/ \;
+          make -j"$(nproc)" libsqlcipher.la
+          find . -name "libsqlcipher.a" -exec cp {} "${{ env.OUT }}/sqlcipher/${ABI}/" \;
 
-          # sqlite3.h is generated by configure — copy once here
-          mkdir -p ${{ env.OUT }}/sqlcipher/include
-          cp sqlite3.h ${{ env.OUT }}/sqlcipher/include/
+          mkdir -p "${{ env.OUT }}/sqlcipher/include"
+          cp sqlite3.h "${{ env.OUT }}/sqlcipher/include/"
           echo "✓ ${ABI}"
 
       # ══════════════════════════════════════════════════════════════════════
@@ -146,6 +144,7 @@ jobs:
       - name: Build armeabi-v7a
         run: |
           set -euo pipefail
+
           ABI="armeabi-v7a"
           TRIPLE="armv7a-linux-androideabi"
           OPENSSL_ARCH="android-arm"
@@ -155,6 +154,7 @@ jobs:
           AR="${TOOLCHAIN}/bin/llvm-ar"
           RANLIB="${TOOLCHAIN}/bin/llvm-ranlib"
           OPENSSL_OUT="/tmp/openssl-${ABI}"
+          ARGON2_CFLAGS="-O2 -fPIC -mthumb --sysroot=${SYSROOT} -Iinclude -DANDROID"
 
           export ANDROID_NDK_ROOT="${NDK_HOME}"
           export PATH="${TOOLCHAIN}/bin:${PATH}"
@@ -162,28 +162,31 @@ jobs:
           echo ">>> OpenSSL ${ABI}"
           cd /tmp/openssl
           make distclean 2>/dev/null || true
-          perl Configure ${OPENSSL_ARCH} \
+          perl Configure "${OPENSSL_ARCH}" \
             -D__ANDROID_API__=${{ env.API_LEVEL }} \
             --prefix="${OPENSSL_OUT}" \
             --openssldir="${OPENSSL_OUT}/ssl" \
-            no-shared no-tests no-ui-console no-asm \
-            2>&1 | tail -3
-          make -j$(nproc) build_libs 2>&1 | tail -3
-          make install_dev 2>&1 | tail -3
+            no-shared no-tests no-ui-console no-asm
+          make -j"$(nproc)" build_libs
+          make install_dev
+          test -f "${OPENSSL_OUT}/include/openssl/crypto.h"
 
           echo ">>> Argon2 ${ABI}"
-          mkdir -p ${{ env.OUT }}/argon2/${ABI}
+          mkdir -p "${{ env.OUT }}/argon2/${ABI}"
           cd /tmp/argon2
           make clean 2>/dev/null || true
-          make libargon2.a -j$(nproc) \
-            CC="$CC" AR="$AR" RANLIB="$RANLIB" \
-            CFLAGS="-O2 -fPIC -mthumb --sysroot=${SYSROOT} -I. -DANDROID"
-          cp libargon2.a ${{ env.OUT }}/argon2/${ABI}/
+          make libargon2.a -j"$(nproc)" \
+            CC="${CC}" \
+            AR="${AR}" \
+            RANLIB="${RANLIB}" \
+            CFLAGS="${ARGON2_CFLAGS}"
+          cp libargon2.a "${{ env.OUT }}/argon2/${ABI}/"
 
           echo ">>> SQLCipher ${ABI}"
-          mkdir -p ${{ env.OUT }}/sqlcipher/${ABI}
+          mkdir -p "${{ env.OUT }}/sqlcipher/${ABI}"
           cd /tmp/sqlcipher
           make distclean 2>/dev/null || true
+
           ./configure \
             --build=x86_64-linux-gnu \
             --host="${TRIPLE}" \
@@ -199,10 +202,11 @@ jobs:
             --enable-static \
             ac_cv_func_posix_getpwuid_r=no \
             ac_cv_func_getpwuid_r=no \
-            ac_cv_have_decl_h_errno=no \
-            2>&1 | tail -8
-          make -j$(nproc) libsqlcipher.la 2>&1 | tail -5
-          find . -name "libsqlcipher.a" -exec cp {} ${{ env.OUT }}/sqlcipher/${ABI}/ \;
+            ac_cv_have_decl_h_errno=no
+
+          make -j"$(nproc)" libsqlcipher.la
+          find . -name "libsqlcipher.a" -exec cp {} "${{ env.OUT }}/sqlcipher/${ABI}/" \;
+
           echo "✓ ${ABI}"
 
       # ══════════════════════════════════════════════════════════════════════
@@ -211,6 +215,7 @@ jobs:
       - name: Build x86_64
         run: |
           set -euo pipefail
+
           ABI="x86_64"
           TRIPLE="x86_64-linux-android"
           OPENSSL_ARCH="android-x86_64"
@@ -220,6 +225,7 @@ jobs:
           AR="${TOOLCHAIN}/bin/llvm-ar"
           RANLIB="${TOOLCHAIN}/bin/llvm-ranlib"
           OPENSSL_OUT="/tmp/openssl-${ABI}"
+          ARGON2_CFLAGS="-O3 -fPIC --sysroot=${SYSROOT} -Iinclude -DANDROID"
 
           export ANDROID_NDK_ROOT="${NDK_HOME}"
           export PATH="${TOOLCHAIN}/bin:${PATH}"
@@ -227,28 +233,31 @@ jobs:
           echo ">>> OpenSSL ${ABI}"
           cd /tmp/openssl
           make distclean 2>/dev/null || true
-          perl Configure ${OPENSSL_ARCH} \
+          perl Configure "${OPENSSL_ARCH}" \
             -D__ANDROID_API__=${{ env.API_LEVEL }} \
             --prefix="${OPENSSL_OUT}" \
             --openssldir="${OPENSSL_OUT}/ssl" \
-            no-shared no-tests no-ui-console no-asm \
-            2>&1 | tail -3
-          make -j$(nproc) build_libs 2>&1 | tail -3
-          make install_dev 2>&1 | tail -3
+            no-shared no-tests no-ui-console no-asm
+          make -j"$(nproc)" build_libs
+          make install_dev
+          test -f "${OPENSSL_OUT}/include/openssl/crypto.h"
 
           echo ">>> Argon2 ${ABI}"
-          mkdir -p ${{ env.OUT }}/argon2/${ABI}
+          mkdir -p "${{ env.OUT }}/argon2/${ABI}"
           cd /tmp/argon2
           make clean 2>/dev/null || true
-          make libargon2.a -j$(nproc) \
-            CC="$CC" AR="$AR" RANLIB="$RANLIB" \
-            CFLAGS="-O3 -fPIC --sysroot=${SYSROOT} -I. -DANDROID"
-          cp libargon2.a ${{ env.OUT }}/argon2/${ABI}/
+          make libargon2.a -j"$(nproc)" \
+            CC="${CC}" \
+            AR="${AR}" \
+            RANLIB="${RANLIB}" \
+            CFLAGS="${ARGON2_CFLAGS}"
+          cp libargon2.a "${{ env.OUT }}/argon2/${ABI}/"
 
           echo ">>> SQLCipher ${ABI}"
-          mkdir -p ${{ env.OUT }}/sqlcipher/${ABI}
+          mkdir -p "${{ env.OUT }}/sqlcipher/${ABI}"
           cd /tmp/sqlcipher
           make distclean 2>/dev/null || true
+
           ./configure \
             --build=x86_64-linux-gnu \
             --host="${TRIPLE}" \
@@ -264,51 +273,63 @@ jobs:
             --enable-static \
             ac_cv_func_posix_getpwuid_r=no \
             ac_cv_func_getpwuid_r=no \
-            ac_cv_have_decl_h_errno=no \
-            2>&1 | tail -8
-          make -j$(nproc) libsqlcipher.la 2>&1 | tail -5
-          find . -name "libsqlcipher.a" -exec cp {} ${{ env.OUT }}/sqlcipher/${ABI}/ \;
+            ac_cv_have_decl_h_errno=no
+
+          make -j"$(nproc)" libsqlcipher.la
+          find . -name "libsqlcipher.a" -exec cp {} "${{ env.OUT }}/sqlcipher/${ABI}/" \;
+
           echo "✓ ${ABI}"
 
-      # ── Verify ────────────────────────────────────────────────────────────
       - name: Verify outputs
         run: |
+          set -euo pipefail
           echo "=== Built artifacts ==="
           FAIL=0
+
           for ABI in arm64-v8a armeabi-v7a x86_64; do
             for LIB in sqlcipher argon2; do
               FILE="${{ env.OUT }}/${LIB}/${ABI}/lib${LIB}.a"
               if [ -f "$FILE" ]; then
-                echo "  ✓ ${LIB}/${ABI}/lib${LIB}.a  ($(du -sh $FILE | cut -f1))"
+                echo "  ✓ ${LIB}/${ABI}/lib${LIB}.a  ($(du -sh "$FILE" | cut -f1))"
               else
                 echo "  ✗ MISSING: ${LIB}/${ABI}/lib${LIB}.a"
                 FAIL=1
               fi
             done
           done
-          [ -f "${{ env.OUT }}/sqlcipher/include/sqlite3.h" ] && \
-            echo "  ✓ sqlcipher/include/sqlite3.h" || \
-            { echo "  ✗ MISSING: sqlcipher/include/sqlite3.h"; FAIL=1; }
-          [ -f "${{ env.OUT }}/argon2/include/argon2.h" ] && \
-            echo "  ✓ argon2/include/argon2.h" || \
-            { echo "  ✗ MISSING: argon2/include/argon2.h"; FAIL=1; }
-          echo "  ✓ fmtlib: $(ls ${{ env.OUT }}/fmt/include/fmt/*.h 2>/dev/null | wc -l) headers"
+
+          if [ -f "${{ env.OUT }}/sqlcipher/include/sqlite3.h" ]; then
+            echo "  ✓ sqlcipher/include/sqlite3.h"
+          else
+            echo "  ✗ MISSING: sqlcipher/include/sqlite3.h"
+            FAIL=1
+          fi
+
+          if [ -f "${{ env.OUT }}/argon2/include/argon2.h" ]; then
+            echo "  ✓ argon2/include/argon2.h"
+          else
+            echo "  ✗ MISSING: argon2/include/argon2.h"
+            FAIL=1
+          fi
+
+          echo "  ✓ fmtlib: $(ls "${{ env.OUT }}/fmt/include/fmt/"*.h 2>/dev/null | wc -l) headers"
           exit $FAIL
 
-      # ── Commit back ───────────────────────────────────────────────────────
       - name: Commit native libs to repository
         run: |
-          git config user.name  "github-actions[bot]"
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add src/cpp/third_party/
+
           if git diff --staged --quiet; then
             echo "No changes — libs already up to date."
           else
             git commit -m "ci: build native deps [SQLCipher ${{ env.SQLCIPHER_TAG }} / Argon2 ${{ env.ARGON2_REF }} / OpenSSL ${{ env.OPENSSL_TAG }}]
 
-            ABIs: arm64-v8a, armeabi-v7a, x86_64
-            NDK: ${{ env.NDK_VERSION }}  API: ${{ env.API_LEVEL }}
-            Triggered by: ${{ github.actor }}"
+ABIs: arm64-v8a, armeabi-v7a, x86_64
+NDK: ${{ env.NDK_VERSION }}  API: ${{ env.API_LEVEL }}
+Triggered by: ${{ github.actor }}"
             git push
           fi
 
