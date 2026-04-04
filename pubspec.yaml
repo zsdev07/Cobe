@@ -1,0 +1,75 @@
+name: cobe
+description: Cobe — AI-powered code editor. Midnight Black. Glassmorphism. C++20 engine.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+  flutter: '>=3.24.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+
+  # FFI
+  ffi: ^2.1.3
+
+  # Editor
+  re_editor: ^0.4.0
+  re_highlight: ^0.0.4
+
+  # Storage & paths
+  path_provider: ^2.1.4
+  shared_preferences: ^2.3.3
+
+  # Networking
+  http: ^1.2.2
+  dio: ^5.7.0
+
+  # UI utilities
+  shimmer: ^3.0.0
+  gap: ^3.0.1
+
+  # File picker (scoped storage)
+  file_picker: ^8.1.4
+  permission_handler: ^11.3.1
+
+  # Diff
+  diff_match_patch: ^0.4.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  build_runner: ^2.4.12
+  riverpod_generator: ^2.4.3
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/fonts/
+
+  fonts:
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/JetBrainsMono-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/JetBrainsMono-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/JetBrainsMono-Italic.ttf
+          style: italic
+    - family: FiraCode
+      fonts:
+        - asset: assets/fonts/FiraCode-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/FiraCode-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/FiraCode-Bold.ttf
+          weight: 700
