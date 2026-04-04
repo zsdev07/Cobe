@@ -35,6 +35,14 @@ jobs:
                 echo "Found: $F ($(du -sh "$F" | cut -f1))"
               fi
             done
+
+            F="src/cpp/third_party/openssl/${ABI}/libcrypto.a"
+            if [ ! -f "$F" ]; then
+              echo "Missing: $F"
+              MISSING=1
+            else
+              echo "Found: $F ($(du -sh "$F" | cut -f1))"
+            fi
           done
 
           if [ $MISSING -eq 1 ]; then
@@ -78,7 +86,7 @@ jobs:
         run: |
           export ANDROID_NDK_HOME="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}/ndk/${{ env.NDK_VERSION }}"
           flutter build apk --debug
-          
+
       - name: Rename APKs
         run: |
           set -euo pipefail
