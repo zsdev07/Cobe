@@ -131,7 +131,7 @@ class DirtyDot extends StatelessWidget {
       duration: const Duration(milliseconds: 200),
       child: Container(
         width: 7, height: 7,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: CobeColors.dotDirty,
           shape: BoxShape.circle,
         ),
@@ -249,7 +249,7 @@ class _FrostOverlayState extends State<FrostOverlay>
             child: Center(
               child: Opacity(
                 opacity: _c.value,
-                child: const Text('🔒 Secured',
+                child: Text('🔒 Secured',
                     style: TextStyle(
                         color: Colors.white70,
                         fontSize: 22,

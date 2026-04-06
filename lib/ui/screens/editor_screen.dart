@@ -51,7 +51,7 @@ void main() {
                 controller: _controller,
                 maxLines: null,
                 expands: true,
-                style: const TextStyle(fontSize: 13, height: 1.3),
+                style: TextStyle(fontSize: 13, height: 1.3),
                 decoration: const InputDecoration(
                   border: InputBorder.none,
                   isDense: true,

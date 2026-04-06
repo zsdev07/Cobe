@@ -63,11 +63,11 @@ class _ArtifactsPanelState extends ConsumerState<ArtifactsPanel>
                   Container(
                     margin: const EdgeInsets.only(top: 4),
                     width: 14, height: 14,
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                         color: CobeColors.pulse, shape: BoxShape.circle),
                     child: Center(
                       child: Text('${artifacts.length}',
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 8, color: Colors.white,
                               fontFamily: 'JetBrainsMono')),
                     ),
@@ -118,12 +118,12 @@ class _PanelHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: CobeColors.divider)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.auto_fix_high_rounded,
+          Icon(Icons.auto_fix_high_rounded,
               size: 16, color: CobeColors.pulse),
           const SizedBox(width: 8),
           Text('Artifacts ($artifactCount)', style: CobeTextStyles.ui),
@@ -172,7 +172,7 @@ class _ArtifactCardState extends ConsumerState<_ArtifactCard> {
           onTap: () => setState(() => _showDiff = !_showDiff),
           child: Row(
             children: [
-              const Icon(Icons.insert_drive_file_outlined,
+              Icon(Icons.insert_drive_file_outlined,
                   size: 14, color: CobeColors.accent),
               const SizedBox(width: 6),
               Expanded(

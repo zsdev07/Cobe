@@ -70,7 +70,7 @@ class _ChatHistoryScreenState extends ConsumerState<ChatHistoryScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Generated Files', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                      Text('Generated Files', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                       const SizedBox(height: CobeSpacing.sm),
                       for (final file in artifacts) ...[
                         FileTile(file: file, onTap: () {}),
@@ -125,7 +125,7 @@ class _ChatHistoryScreenState extends ConsumerState<ChatHistoryScreen> {
                     onChanged: (value) => ref.read(draftProvider.notifier).state = value,
                     controller: TextEditingController(text: draft)
                       ..selection = TextSelection.collapsed(offset: draft.length),
-                    style: const TextStyle(fontSize: 13),
+                    style: TextStyle(fontSize: 13),
                     decoration: const InputDecoration(
                       hintText: 'Type prompt…',
                       border: InputBorder.none,
@@ -138,7 +138,7 @@ class _ChatHistoryScreenState extends ConsumerState<ChatHistoryScreen> {
                     controller.sendUserMessage(draft);
                     _simulateStream(controller);
                   },
-                  icon: const Icon(Icons.arrow_upward_rounded, size: 18),
+                  icon: Icon(Icons.arrow_upward_rounded, size: 18),
                 ),
               ],
             ),
@@ -163,7 +163,7 @@ class _Header extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Chat', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+              Text('Chat', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
               Text(project.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: CobeTokens.dark.textMuted)),
             ],
           ),

@@ -17,7 +17,7 @@ ThemeData buildCobeTheme() {
       onSurface: t.textPrimary,
       onPrimary: Color(0xFF040404),
     ),
-    textTheme: const TextTheme(
+    textTheme: TextTheme(
       titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.2),
       titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
       bodyLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, height: 1.35),

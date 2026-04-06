@@ -104,21 +104,21 @@ class _FileExplorerState extends ConsumerState<FileExplorerScreen> {
       backgroundColor: CobeColors.bg,
       appBar: AppBar(
         backgroundColor: const Color(0xFF060810),
-        title: const Text('Files', style: CobeTextStyles.ui),
+        title: Text('Files', style: CobeTextStyles.ui),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_rounded,
+          icon: Icon(Icons.arrow_back_ios_rounded,
               size: 16, color: CobeColors.textSub),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.folder_open_rounded,
+            icon: Icon(Icons.folder_open_rounded,
                 size: 18, color: CobeColors.accent),
             onPressed: _pickFolder,
             tooltip: 'Open Folder',
           ),
           IconButton(
-            icon: const Icon(Icons.insert_drive_file_outlined,
+            icon: Icon(Icons.insert_drive_file_outlined,
                 size: 18, color: CobeColors.accent),
             onPressed: _pickFile,
             tooltip: 'Open File',
@@ -136,7 +136,7 @@ class _FileExplorerState extends ConsumerState<FileExplorerScreen> {
                   color: const Color(0xFF060810),
                   child: Row(
                     children: [
-                      const Icon(Icons.folder_open_rounded,
+                      Icon(Icons.folder_open_rounded,
                           size: 12, color: CobeColors.textSub),
                       const SizedBox(width: 6),
                       Expanded(
@@ -249,12 +249,12 @@ class _EmptyPicker extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.folder_open_rounded,
+            Icon(Icons.folder_open_rounded,
                 size: 36, color: CobeColors.textSub),
             const SizedBox(height: 12),
-            const Text('No folder open', style: CobeTextStyles.ui),
+            Text('No folder open', style: CobeTextStyles.ui),
             const SizedBox(height: 4),
-            const Text('Open a project folder or single file',
+            Text('Open a project folder or single file',
                 style: CobeTextStyles.uiSub),
             const SizedBox(height: 20),
             Row(

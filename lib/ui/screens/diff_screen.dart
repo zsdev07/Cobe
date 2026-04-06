@@ -13,7 +13,7 @@ class DiffScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Diff', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+          Text('Diff', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
           const SizedBox(height: CobeSpacing.sm),
           Text('lib/ui/screens/chat_screen.dart', style: TextStyle(fontSize: 11, color: CobeTokens.dark.textMuted)),
           const SizedBox(height: CobeSpacing.sm),

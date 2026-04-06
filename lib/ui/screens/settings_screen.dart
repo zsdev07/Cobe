@@ -25,7 +25,7 @@ class SettingsScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Settings', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+          Text('Settings', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
           const SizedBox(height: CobeSpacing.md),
           Expanded(
             child: ListView.separated(
@@ -38,7 +38,7 @@ class SettingsScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(group.$1, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                      Text(group.$1, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                       const SizedBox(height: CobeSpacing.xs),
                       for (final entry in group.$2)
                         Padding(

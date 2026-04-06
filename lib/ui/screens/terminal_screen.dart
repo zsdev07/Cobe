@@ -100,15 +100,15 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
           Container(
             height: 32,
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(bottom: BorderSide(color: CobeColors.divider)),
             ),
             child: Row(
               children: [
-                const Icon(Icons.terminal_rounded,
+                Icon(Icons.terminal_rounded,
                     size: 14, color: CobeColors.accent),
                 const SizedBox(width: 8),
-                const Text('Terminal', style: CobeTextStyles.uiSub),
+                Text('Terminal', style: CobeTextStyles.uiSub),
                 const Spacer(),
                 _dot(CobeColors.error),
                 const SizedBox(width: 4),
@@ -140,7 +140,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
           ),
           // Input
           Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(top: BorderSide(color: CobeColors.divider)),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -192,11 +192,11 @@ class _TerminalDisabled extends ConsumerWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.terminal_rounded, size: 28, color: CobeColors.textSub),
+          Icon(Icons.terminal_rounded, size: 28, color: CobeColors.textSub),
           const SizedBox(height: 10),
-          const Text('Terminal is disabled', style: CobeTextStyles.ui),
+          Text('Terminal is disabled', style: CobeTextStyles.ui),
           const SizedBox(height: 4),
-          const Text('Enable in Provider Settings → Interface',
+          Text('Enable in Provider Settings → Interface',
               style: CobeTextStyles.uiSub),
           const SizedBox(height: 12),
           GestureDetector(
@@ -211,7 +211,7 @@ class _TerminalDisabled extends ConsumerWidget {
                 border: Border.all(
                     color: CobeColors.pulse.withOpacity(0.4)),
               ),
-              child: const Text('Enable Terminal',
+              child: Text('Enable Terminal',
                   style: TextStyle(
                       color: CobeColors.pulse,
                       fontSize: 13,

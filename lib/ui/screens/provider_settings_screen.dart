@@ -45,10 +45,10 @@ class _ProviderSettingsScreenState
     return Scaffold(
       backgroundColor: CobeColors.bg,
       appBar: AppBar(
-        title: const Text('Provider Settings'),
+        title: Text('Provider Settings'),
         backgroundColor: const Color(0xFF060810),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_rounded,
+          icon: Icon(Icons.arrow_back_ios_rounded,
               size: 16, color: CobeColors.textSub),
           onPressed: () => Navigator.pop(context),
         ),
@@ -117,7 +117,7 @@ class _ProviderSettingsScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Hover Menu Style', style: CobeTextStyles.ui),
+                Text('Hover Menu Style', style: CobeTextStyles.ui),
                 const SizedBox(height: 10),
                 Row(
                   children: [
@@ -157,7 +157,7 @@ class _ProviderSettingsScreenState
             padding: const EdgeInsets.all(14),
             child: Row(
               children: [
-                const Icon(Icons.lock_outline_rounded,
+                Icon(Icons.lock_outline_rounded,
                     size: 16, color: CobeColors.error),
                 const SizedBox(width: 10),
                 const Expanded(
@@ -186,7 +186,7 @@ class _ProviderSettingsScreenState
                           color: CobeColors.error.withOpacity(0.5)),
                       color: CobeColors.error.withOpacity(0.1),
                     ),
-                    child: const Text('Trigger',
+                    child: Text('Trigger',
                         style: TextStyle(
                             color: CobeColors.error,
                             fontSize: 12,
