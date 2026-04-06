@@ -30,18 +30,33 @@ class FileTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Icon(Icons.description_outlined, size: 18, color: t.textPrimary),
+            Icon(Icons.description_outlined, size: 18, color: t.textPrimary),
             const SizedBox(width: CobeSpacing.sm),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(file.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, color: t.textPrimary)),
-                  Text('${file.lines} lines', style: const TextStyle(fontSize: 11, color: t.textMuted)),
+                  Text(
+                    file.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12.5, color: t.textPrimary),
+                  ),
+                  Text(
+                    '${file.lines} lines',
+                    style: TextStyle(fontSize: 11, color: t.textMuted),
+                  ),
                 ],
               ),
             ),
-            Text(file.status, style: TextStyle(fontSize: 11, color: statusColor, fontWeight: FontWeight.w600)),
+            Text(
+              file.status,
+              style: TextStyle(
+                fontSize: 11,
+                color: statusColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),
