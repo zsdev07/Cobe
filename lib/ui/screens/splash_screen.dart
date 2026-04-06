@@ -48,9 +48,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 borderRadius: CobeRadius.lg,
                 color: t.bgPanel,
                 border: Border.all(color: t.border),
-                boxShadow: const [BoxShadow(color: t.glow, blurRadius: 28, spreadRadius: 0.5)],
+                boxShadow: [BoxShadow(color: t.glow, blurRadius: 28, spreadRadius: 0.5)],
               ),
-              child: const Center(
+              child: Center(
                 child: Text('C', style: TextStyle(fontSize: 56, fontWeight: FontWeight.w700, color: t.textPrimary)),
               ),
             ),
