@@ -1,0 +1,45 @@
+name: Remove Const From UI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Remove const from UI files
+        run: |
+          echo "Removing const from UI..."
+
+          # Remove const before TextStyle
+          find lib/ui -type f -name "*.dart" -exec sed -i 's/const TextStyle/TextStyle/g' {} +
+
+          # Remove const before Icon
+          find lib/ui -type f -name "*.dart" -exec sed -i 's/const Icon/Icon/g' {} +
+
+          # Remove const Row/Column
+          find lib/ui -type f -name "*.dart" -exec sed -i 's/const Row/Row/g' {} +
+          find lib/ui -type f -name "*.dart" -exec sed -i 's/const Column/Column/g' {} +
+
+          # Remove const Container / BoxDecoration
+          find lib/ui -type f -name "*.dart" -exec sed -i 's/const BoxDecoration/BoxDecoration/g' {} +
+          find lib/ui -type f -name "*.dart" -exec sed -i 's/const Container/Container/g' {} +
+
+          # Remove const Text (important)
+          find lib/ui -type f -name "*.dart" -exec sed -i 's/const Text/Text/g' {} +
+
+          # Remove const lists (common issue)
+          find lib/ui -type f -name "*.dart" -exec sed -i 's/children: const \[/children: [/g' {} +
+
+      - name: Commit changes
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+
+          git add .
+          git commit -m "fix: remove const from UI layer" || echo "No changes"
+          git push
