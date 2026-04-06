@@ -32,16 +32,16 @@ class ChatBubble extends StatelessWidget {
               children: [
                 Text(
                   message.provider,
-                  style: const TextStyle(fontSize: 10, color: t.textMuted),
+                  style: TextStyle(fontSize: 10, color: t.textMuted),
                 ),
                 const SizedBox(width: CobeSpacing.xs),
-                Container(width: 3, height: 3, decoration: const BoxDecoration(color: t.textMuted, shape: BoxShape.circle)),
+                Container(width: 3, height: 3, decoration: BoxDecoration(color: t.textMuted, shape: BoxShape.circle)),
                 const SizedBox(width: CobeSpacing.xs),
                 Flexible(
                   child: Text(
                     message.model,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 10, color: t.textMuted),
+                    style: TextStyle(fontSize: 10, color: t.textMuted),
                   ),
                 ),
               ],
@@ -49,7 +49,7 @@ class ChatBubble extends StatelessWidget {
             const SizedBox(height: CobeSpacing.xs),
             SelectableText(
               message.text,
-              style: const TextStyle(fontSize: 13, color: t.textPrimary, height: 1.35),
+              style: TextStyle(fontSize: 13, color: t.textPrimary, height: 1.35),
             ),
             if (message.isStreaming)
               const Padding(
