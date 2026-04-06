@@ -10,7 +10,7 @@ ThemeData buildCobeTheme() {
     brightness: Brightness.dark,
     scaffoldBackgroundColor: t.bgBase,
     fontFamily: 'JetBrainsMono',
-    colorScheme: const ColorScheme.dark(
+    colorScheme: ColorScheme.dark(
       primary: t.accent,
       secondary: t.textMuted,
       surface: t.bgPanel,
