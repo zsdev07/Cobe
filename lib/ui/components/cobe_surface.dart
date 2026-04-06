@@ -26,7 +26,7 @@ class CobeSurface extends StatelessWidget {
         color: t.bgCard,
         borderRadius: radius,
         border: Border.all(color: t.border),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(color: t.glow, blurRadius: 20, spreadRadius: 0.3),
         ],
       ),
