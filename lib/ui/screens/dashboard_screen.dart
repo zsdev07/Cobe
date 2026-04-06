@@ -114,7 +114,7 @@ class _GlobalSearch extends StatelessWidget {
         border: Border.all(color: CobeTokens.dark.border),
         borderRadius: CobeRadius.md,
       ),
-      child: const Row(
+      child: Row(
         children: [
           Icon(Icons.search_rounded, size: 18, color: CobeTokens.dark.textMuted),
           SizedBox(width: CobeSpacing.xs),
